@@ -1,0 +1,169 @@
+/**
+ * print.css — Estilos de impressao de cupom fiscal para impressoras termicas.
+ * Importado em main.tsx para ser aplicado globalmente via @media print.
+ *
+ * O PDV gera um div#print-cupom que e ocultado na tela mas aparece ao imprimir.
+ * Suporta papel 58mm, 80mm e A4 — o tamanho e definido pela classe no body.
+ */
+
+/* Oculta a interface do PDV durante impressao */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #print-cupom,
+  #print-cupom * {
+    visibility: visible;
+  }
+
+  #print-cupom {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  /* === Papel 80mm (padrao) === */
+  body.print-80mm #print-cupom {
+    width: 72mm;
+    font-size: 10pt;
+  }
+
+  /* === Papel 58mm === */
+  body.print-58mm #print-cupom {
+    width: 48mm;
+    font-size: 8pt;
+  }
+
+  /* === A4 === */
+  body.print-a4 #print-cupom {
+    width: 190mm;
+    font-size: 11pt;
+  }
+
+  @page {
+    margin: 2mm;
+  }
+}
+
+/* Estilos compartilhados do cupom (vistos no preview na tela e na impressao) */
+.cupom {
+  font-family: "Courier New", Courier, monospace;
+  color: #000;
+  background: #fff;
+  padding: 4mm;
+  width: 100%;
+}
+
+.cupom-header {
+  text-align: center;
+  border-bottom: 1px dashed #000;
+  padding-bottom: 3mm;
+  margin-bottom: 3mm;
+}
+
+.cupom-header .store-name {
+  font-size: 1.1em;
+  font-weight: bold;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.cupom-header .store-info {
+  font-size: 0.75em;
+  line-height: 1.5;
+  margin-top: 1mm;
+}
+
+.cupom-header img.store-logo {
+  max-width: 30mm;
+  max-height: 15mm;
+  object-fit: contain;
+  margin-bottom: 2mm;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cupom-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+  margin-bottom: 3mm;
+}
+
+.cupom-items th {
+  text-align: left;
+  font-weight: bold;
+  border-bottom: 1px dashed #000;
+  padding: 1mm 0;
+}
+
+.cupom-items td {
+  padding: 0.5mm 0;
+  vertical-align: top;
+}
+
+.cupom-items .item-qty {
+  width: 8mm;
+  text-align: right;
+  padding-right: 2mm;
+}
+
+.cupom-items .item-price {
+  width: 18mm;
+  text-align: right;
+}
+
+.cupom-items .item-subtotal {
+  width: 20mm;
+  text-align: right;
+}
+
+.cupom-totals {
+  border-top: 1px dashed #000;
+  padding-top: 2mm;
+  margin-top: 2mm;
+  font-size: 0.85em;
+}
+
+.cupom-totals .total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5mm 0;
+}
+
+.cupom-totals .total-row.grand-total {
+  font-size: 1.1em;
+  font-weight: bold;
+  border-top: 1px dashed #000;
+  padding-top: 2mm;
+  margin-top: 1mm;
+}
+
+.cupom-payment {
+  margin-top: 3mm;
+  font-size: 0.85em;
+  border-top: 1px dashed #000;
+  padding-top: 2mm;
+}
+
+.cupom-footer {
+  text-align: center;
+  margin-top: 4mm;
+  border-top: 1px dashed #000;
+  padding-top: 3mm;
+  font-size: 0.75em;
+  line-height: 1.6;
+}
+
+.cupom-footer .footer-msg {
+  font-style: italic;
+}
+
+.cupom-footer .sale-id {
+  font-size: 0.7em;
+  color: #555;
+  margin-top: 2mm;
+}

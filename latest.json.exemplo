@@ -1,0 +1,11 @@
+{
+  "version": "0.1.1",
+  "notes": "Atualizações e melhorias do Simplifica Oficina.",
+  "pub_date": "2026-09-20T12:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "CONTEUDO_DO_ARQUIVO_.sig_GERADO_NO_BUILD",
+      "url": "https://github.com/gbtrajano/simplificaoficina.json/releases/download/v0.1.1/Simplifica.Oficina_0.1.1_x64-setup.exe"
+    }
+  }
+}
