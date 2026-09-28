@@ -6,11 +6,14 @@ import type { Appointment, ServiceOrder, WorkshopDashboard } from "../types";
 
 const money=(v:number)=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const statusLabel:Record<string,string>={draft:"Orçamento",approved:"Aprovada",in_progress:"Em execução",waiting_parts:"Aguardando peça",ready:"Pronta",delivered:"Entregue",canceled:"Cancelada"};
+const greetingForHour=(hour:number)=>hour>=5&&hour<12?"Bom dia":hour>=12&&hour<18?"Boa tarde":"Boa noite";
 export default function Dashboard(){
  const nav=useNavigate(); const [stats,setStats]=useState<WorkshopDashboard>({open_orders:0,in_progress:0,ready:0,today_appointments:0,month_revenue:0,vehicles:0}); const [orders,setOrders]=useState<ServiceOrder[]>([]); const [agenda,setAgenda]=useState<Appointment[]>([]);
+ const [greeting,setGreeting]=useState(()=>greetingForHour(new Date().getHours()));
  useEffect(()=>{api.workshopDashboard().then(setStats).catch(console.error);api.listServiceOrders("","").then(x=>setOrders(x.slice(0,5))).catch(console.error);api.listAppointments(new Date().toISOString().slice(0,10)).then(setAgenda).catch(console.error)},[]);
+ useEffect(()=>{const timer=window.setInterval(()=>setGreeting(greetingForHour(new Date().getHours())),60_000);return()=>window.clearInterval(timer)},[]);
  return <div className="dashboard-page page-enter">
-  <section className="welcome-row"><div><h2>Bom dia! <span>👋</span></h2><p>Acompanhe o movimento da sua oficina hoje.</p></div><button className="primary-action" onClick={()=>nav("/ordens?nova=1")}><Icon name="plus" size={18}/> Nova ordem de serviço</button></section>
+  <section className="welcome-row"><div><h2>{greeting}! <span>👋</span></h2><p>Acompanhe o movimento da sua oficina hoje.</p></div><button className="primary-action" onClick={()=>nav("/ordens?nova=1")}><Icon name="plus" size={18}/> Nova ordem de serviço</button></section>
   <section className="metric-grid">
    <Metric label="Ordens abertas" value={stats.open_orders} detail={`${stats.in_progress} em execução`} icon="clipboard" tone="blue"/>
    <Metric label="Veículos na oficina" value={stats.in_progress} detail={`${stats.ready} prontos para entrega`} icon="car" tone="orange"/>

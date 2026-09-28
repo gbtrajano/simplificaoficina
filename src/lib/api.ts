@@ -28,6 +28,10 @@ export const api = {
     invoke("save_service_order", { order, id: id ?? null }),
   updateServiceOrderStatus: (id: number, status: string): Promise<void> =>
     invoke("update_service_order_status", { id, status }),
+  assignServiceOrderMechanic: (id: number, mechanic: string): Promise<void> =>
+    invoke("assign_service_order_mechanic", { id, mechanic }),
+  deleteServiceOrder: (id: number): Promise<void> =>
+    invoke("delete_service_order", { id }),
   listAppointments: (date: string): Promise<Appointment[]> => invoke("list_appointments", { date }),
   saveAppointment: (appointment: Omit<Appointment, "id" | "created_at">, id?: number): Promise<number> =>
     invoke("save_appointment", { appointment, id: id ?? null }),
@@ -213,6 +217,8 @@ export const api = {
     invoke("create_audit_log", { userId, userName, action, details, terminal }),
 
   // ---------- Informações da Loja ----------
+  getDatabasePath: (): Promise<string> =>
+    invoke("get_database_path"),
   getStoreSettings: (): Promise<StoreSettings> =>
     invoke("get_store_settings"),
   saveStoreSettings: (settings: StoreSettings): Promise<StoreSettings> =>

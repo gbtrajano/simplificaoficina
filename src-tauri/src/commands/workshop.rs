@@ -135,6 +135,26 @@ pub fn save_service_order(state: State<DbState>, order: ServiceOrderInput, id: O
 #[tauri::command]
 pub fn update_service_order_status(state: State<DbState>, id:i64, status:String) -> Result<(),String> { let conn=state.0.lock().map_err(|e|e.to_string())?; conn.execute("UPDATE service_orders SET status=?1,updated_at=?2 WHERE id=?3",params![status,Utc::now().to_rfc3339(),id]).map_err(|e|e.to_string())?; Ok(()) }
 
+#[tauri::command]
+pub fn assign_service_order_mechanic(state: State<DbState>, id: i64, mechanic: String) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE service_orders SET mechanic=?1,updated_at=?2 WHERE id=?3",
+        params![mechanic.trim(), Utc::now().to_rfc3339(), id],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_service_order(state: State<DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let affected = conn.execute("DELETE FROM service_orders WHERE id=?1", [id]).map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err("Ordem de serviço não encontrada.".into());
+    }
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Appointment { pub id:i64,pub customer_name:String,pub phone:String,pub vehicle:String,pub plate:String,pub service:String,pub scheduled_at:String,pub status:String,pub notes:String,pub created_at:String }
 #[derive(Deserialize)]

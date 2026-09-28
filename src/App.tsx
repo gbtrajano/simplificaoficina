@@ -19,14 +19,18 @@ import Licencas from "./pages/Licencas";
 import RedeLocal from "./pages/RedeLocal";
 import ConfiguracaoImpressora from "./pages/ConfiguracaoImpressora";
 import Servicos from "./pages/Servicos";
+import Orcamentos from "./pages/Orcamentos";
+import Fornecedores from "./pages/Fornecedores";
 
 export default function App(){
  return <SessionGate><LicenseBoundary><WorkshopShell><Routes>
   <Route path="/" element={<Dashboard/>}/>
   <Route path="/ordens" element={<OrdensServico/>}/>
+  <Route path="/orcamentos" element={<Orcamentos/>}/>
   <Route path="/agenda" element={<AgendaOficina/>}/>
   <Route path="/veiculos" element={<Veiculos/>}/>
   <Route path="/clientes" element={<Clientes/>}/>
+  <Route path="/fornecedores" element={<Fornecedores/>}/>
   <Route path="/pecas" element={<Produtos/>}/>
   <Route path="/servicos" element={<Servicos/>}/>
   <Route path="/financeiro" element={<Contas/>}/>
@@ -35,6 +39,7 @@ export default function App(){
   <Route path="/oficina-movel" element={<AdminOnly><RedeLocal/></AdminOnly>}/>
   <Route path="/impressora" element={<AdminOnly><ConfiguracaoImpressora/></AdminOnly>}/>
   <Route path="/configuracoes" element={<AdminOnly><Configuracoes/></AdminOnly>}/>
+  <Route path="/configuracoes/:section" element={<AdminOnly><Configuracoes/></AdminOnly>}/>
   <Route path="/suporte" element={<Suporte/>}/>
   <Route path="/licencas" element={<SellerGate><Licencas/></SellerGate>}/>
   <Route path="/vendedor" element={<Navigate to="/licencas" replace/>}/>

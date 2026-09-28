@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Icon from "../components/Icon";
+import { useSession } from "../components/SessionGate";
 import { api } from "../lib/api";
 import type { Customer, Product, ServiceOrder, Vehicle, WorkshopService } from "../types";
 
@@ -17,6 +18,7 @@ const whatsappPhone = (phone: string) => {
 };
 
 export default function OrdensServico() {
+  const { user } = useSession();
   const [params, setParams] = useSearchParams();
   const [items, setItems] = useState<ServiceOrder[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -31,6 +33,8 @@ export default function OrdensServico() {
   const [selectedPart, setSelectedPart] = useState("");
   const [partQuantity, setPartQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [assignmentBusy, setAssignmentBusy] = useState(false);
+  const [assignmentMessage, setAssignmentMessage] = useState("");
   const [error, setError] = useState("");
   const modal = params.has("nova") || params.has("editar");
 
@@ -62,7 +66,7 @@ export default function OrdensServico() {
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id === form.vehicle_id);
   const customer = customers.find((item) => item.id === form.customer_id);
 
-  const close = () => { setParams({}); setError(""); setSelectedService(""); setSelectedPart(""); setPartQuantity(1); };
+  const close = () => { setParams({}); setError(""); setAssignmentMessage(""); setSelectedService(""); setSelectedPart(""); setPartQuantity(1); };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!form.vehicle_id) { setError("Selecione um veículo."); return; }
@@ -72,6 +76,38 @@ export default function OrdensServico() {
     finally { setBusy(false); }
   };
   const changeStatus = async (id: number, status: string) => { await api.updateServiceOrderStatus(id, status); load(); };
+  const assignToMe = async () => {
+    if (!edit || !user?.name) return;
+    setAssignmentBusy(true); setError("");
+    try {
+      await api.assignServiceOrderMechanic(edit, user.name);
+      setForm({ ...form, mechanic: user.name });
+      setItems((current) => current.map((order) => order.id === edit ? { ...order, mechanic: user.name } : order));
+      setAssignmentMessage(`OS assumida por ${user.name}.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setAssignmentBusy(false); }
+  };
+  const releaseAssignment = async () => {
+    if (!edit) return;
+    setAssignmentBusy(true); setError("");
+    try {
+      await api.assignServiceOrderMechanic(edit, "");
+      setForm({ ...form, mechanic: "" });
+      setItems((current) => current.map((order) => order.id === edit ? { ...order, mechanic: "" } : order));
+      setAssignmentMessage("A OS ficou disponível para a equipe.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setAssignmentBusy(false); }
+  };
+  const deleteOrder = async () => {
+    if (!edit || !confirm(`Excluir permanentemente a OS #${String(edit).padStart(4, "0")}?\n\nEsta ação não poderá ser desfeita.`)) return;
+    setBusy(true); setError("");
+    try {
+      await api.deleteServiceOrder(edit);
+      close();
+      await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(false); }
+  };
   const addService = () => {
     const service = catalog.find((item) => item.id === Number(selectedService));
     if (!service) return;
@@ -111,15 +147,16 @@ export default function OrdensServico() {
     <div className="section-heading"><div><h2>Ordens de serviço</h2><p>Controle cada etapa do atendimento, do orçamento à entrega</p></div><button className="primary-action" onClick={() => setParams({ nova: "1" })}><Icon name="plus" size={18}/>Nova ordem</button></div>
     <div className="filter-tabs">{[["", "Todas"], ["draft", "Orçamentos"], ["in_progress", "Em execução"], ["waiting_parts", "Aguardando peças"], ["ready", "Prontas"], ["delivered", "Entregues"]].map(([value, label]) => <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{label}</button>)}</div>
     <div className="toolbar-card"><label className="search-field"><Icon name="search" size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por OS, placa, veículo ou cliente..."/></label><span>{items.length} resultado{items.length !== 1 && "s"}</span></div>
-    <div className="data-panel">{items.length === 0 ? <div className="large-empty"><span><Icon name="clipboard" size={30}/></span><h3>Nenhuma ordem encontrada</h3><p>Crie uma ordem para registrar o diagnóstico e os serviços do veículo.</p><button className="primary-action" onClick={() => setParams({ nova: "1" })}><Icon name="plus"/>Criar ordem</button></div> : <table className="workshop-table"><thead><tr><th>OS / veículo</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Previsão</th><th>Total</th><th/></tr></thead><tbody>{items.map((order) => <tr key={order.id}><td><div className="table-entity"><span><Icon name="car" size={18}/></span><div><strong>OS #{String(order.id).padStart(4, "0")} · {order.vehicle_name}</strong><small><b className="plate mini">{order.plate}</b> {order.complaint || "Sem relato"}</small></div></div></td><td>{order.customer_name || "—"}</td><td><select className={`inline-status ${order.status}`} value={order.status} onChange={(event) => void changeStatus(order.id, event.target.value)}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td><td>{order.mechanic || "Não atribuído"}</td><td>{order.promised_at ? new Date(order.promised_at).toLocaleDateString("pt-BR") : "—"}</td><td><strong>{money(order.total)}</strong></td><td><button className="table-action" onClick={() => setParams({ editar: String(order.id) })}>Abrir</button></td></tr>)}</tbody></table>}</div>
+    <div className="data-panel">{items.length === 0 ? <div className="large-empty"><span><Icon name="clipboard" size={30}/></span><h3>Nenhuma ordem encontrada</h3><p>Crie uma ordem para registrar o diagnóstico e os serviços do veículo.</p><button className="primary-action" onClick={() => setParams({ nova: "1" })}><Icon name="plus"/>Criar ordem</button></div> : <table className="workshop-table"><thead><tr><th>OS / veículo</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Previsão</th><th>Total</th><th/></tr></thead><tbody>{items.map((order) => <tr key={order.id}><td><div className="table-entity"><span><Icon name="car" size={18}/></span><div><strong>OS #{String(order.id).padStart(4, "0")} · {order.vehicle_name}</strong><small><b className="plate mini">{order.plate}</b> {order.complaint || "Sem relato"}</small></div></div></td><td>{order.customer_name || "—"}</td><td><select className={`inline-status ${order.status}`} value={order.status} onChange={(event) => void changeStatus(order.id, event.target.value)}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td><td>{order.mechanic || "Não atribuído"}</td><td>{order.promised_at ? new Date(order.promised_at).toLocaleDateString("pt-BR") : "—"}</td><td><strong>{money(order.total)}</strong></td><td><button className="table-action" onClick={() => setParams({ editar: String(order.id) })}>Editar</button></td></tr>)}</tbody></table>}</div>
     {modal && <div className="modal-backdrop"><form className="workshop-modal wide" onSubmit={submit}>
-      <div className="modal-head"><div><h3>{edit ? `Ordem #${String(edit).padStart(4, "0")}` : "Nova ordem de serviço"}</h3><p>Monte o orçamento com serviços e peças do estoque</p></div><button type="button" onClick={close}><Icon name="x"/></button></div>
+      <div className="modal-head"><div><h3>{edit ? `Editar ordem #${String(edit).padStart(4, "0")}` : "Nova ordem de serviço"}</h3><p>{edit ? "Corrija as informações e salve as alterações" : "Monte o orçamento com serviços e peças do estoque"}</p></div><button type="button" onClick={close}><Icon name="x"/></button></div>
       <div className="form-grid three">
         <label className="span2">Veículo<select required value={form.vehicle_id || ""} onChange={(event) => { const id = Number(event.target.value); const vehicle = vehicles.find((item) => item.id === id); setForm({ ...form, vehicle_id: id, customer_id: vehicle?.customer_id ?? null }); }}><option value="">Selecione...</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} — {vehicle.brand} {vehicle.model}</option>)}</select></label>
         <label>Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Prioridade<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
-        <label>Mecânico responsável<input value={form.mechanic} onChange={(event) => setForm({ ...form, mechanic: event.target.value })} placeholder="Nome do responsável"/></label>
         <label>Previsão de entrega<input type="datetime-local" value={form.promised_at?.slice(0, 16) || ""} onChange={(event) => setForm({ ...form, promised_at: event.target.value || null })}/></label>
+        {edit ? <div className="mechanic-assignment full"><div><span>Responsável pela execução</span><strong>{form.mechanic || "Nenhum mecânico assumiu esta OS"}</strong><small>O responsável pode ser alterado quando outro profissional assumir o serviço.</small></div><div>{form.mechanic !== user?.name && <button type="button" className="primary-action" disabled={assignmentBusy || !user?.name} onClick={() => void assignToMe()}>{assignmentBusy ? "Atualizando..." : "Assumir esta OS"}</button>}{form.mechanic && <button type="button" className="secondary-action" disabled={assignmentBusy} onClick={() => void releaseAssignment()}>Deixar disponível</button>}</div></div> : <div className="mechanic-unassigned-note full"><Icon name="team" size={18}/><div><strong>Responsável definido depois</strong><span>A OS será criada disponível para a equipe. O mecânico que executar o serviço poderá assumi-la.</span></div></div>}
+        {assignmentMessage && <div className="assignment-feedback full"><Icon name="check" size={15}/>{assignmentMessage}</div>}
         <label className="full">Relato do cliente<textarea required rows={2} value={form.complaint} onChange={(event) => setForm({ ...form, complaint: event.target.value })} placeholder="Descreva o problema informado..."/></label>
         <label className="full">Diagnóstico técnico<textarea rows={2} value={form.diagnosis} onChange={(event) => setForm({ ...form, diagnosis: event.target.value })} placeholder="Resultado da avaliação mecânica..."/></label>
       </div>
@@ -140,7 +177,7 @@ export default function OrdensServico() {
         <div className="order-total"><span>Total do orçamento</span><strong>{money(total)}</strong>{customer?.phone ? <small>WhatsApp: {customer.phone}</small> : <small>Cadastre o telefone do cliente para enviar</small>}</div>
       </div>
       {error && <div className="form-error">{error}</div>}
-      <div className="modal-actions"><button type="button" className="secondary-action" onClick={close}>Cancelar</button><button disabled={busy} className="primary-action">{busy ? "Salvando..." : "Salvar ordem"}</button></div>
+      <div className="modal-actions">{edit && <button type="button" className="danger-action" disabled={busy} onClick={() => void deleteOrder()}>Excluir OS</button>}<span className="action-spacer"/><button type="button" className="secondary-action" onClick={close}>Cancelar</button><button disabled={busy} className="primary-action">{busy ? "Salvando..." : edit ? "Salvar alterações" : "Criar ordem"}</button></div>
     </form></div>}
   </div>;
 }

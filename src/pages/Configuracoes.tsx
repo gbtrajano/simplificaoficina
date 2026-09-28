@@ -2,23 +2,24 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { checkForUpdate, UpdateStatus } from "../lib/updater";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { StoreSettings, PixSettings, CardMachineSettings, DEFAULT_PIX_SETTINGS, DEFAULT_CARD_SETTINGS, LS_PIX_KEY, LS_CARD_KEY, CardAcquirer } from "../types";
 
-const DB_PATHS: Record<string, string> = {
-  win32: "%APPDATA%\\com.simplificapdv.app\\simplificapdv.db",
-  linux: "~/.local/share/com.simplificapdv.app/simplificapdv.db",
-  darwin: "~/Library/Application Support/com.simplificapdv.app/simplificapdv.db",
-};
-
 const localStorageKeys = [
-  { key: "simplificapdv_plan", label: "Plano de Mensalidade" },
-  { key: "simplificapdv_reviews", label: "Avaliações" },
   { key: "simplificapdv_fiscal_config", label: "Configuração Fiscal" },
 ];
 
 export default function Configuracoes() {
+  const { section: routeSection } = useParams();
+  const section = ["loja", "pagamentos", "atualizacoes", "dados"].includes(routeSection || "") ? routeSection : "loja";
+  const sectionHeader = {
+    loja: ["Loja", "Informações e identidade da sua oficina"],
+    pagamentos: ["Pagamentos", "Configure as integrações e formas de recebimento"],
+    atualizacoes: ["Atualizações", "Consulte a versão instalada e procure novas versões"],
+    dados: ["Dados do Sistema", "Localização, backup e dados armazenados neste computador"],
+  }[section as "loja" | "pagamentos" | "atualizacoes" | "dados"];
   const [version, setVersion] = useState("");
   const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
   const [dbPath, setDbPath] = useState("");
@@ -47,19 +48,15 @@ export default function Configuracoes() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [cleared, setCleared] = useState(false);
   const [clearConfirmText, setClearConfirmText] = useState("");
+  const [dbLocationError, setDbLocationError] = useState("");
 
   useEffect(() => {
     getVersion().then(setVersion);
     api.getStoreSettings().then(setStore).catch(console.error);
-    // Detect platform
-    const platform = navigator.platform.toLowerCase();
-    if (platform.includes("win")) {
-      setDbPath(DB_PATHS.win32);
-    } else if (platform.includes("mac")) {
-      setDbPath(DB_PATHS.darwin);
-    } else {
-      setDbPath(DB_PATHS.linux);
-    }
+    api.getDatabasePath().then(setDbPath).catch((error) => {
+      console.error(error);
+      setDbLocationError("Não foi possível identificar a localização do banco de dados.");
+    });
     // Scan localStorage
     const items = localStorageKeys.map(({ key, label }) => {
       const raw = localStorage.getItem(key);
@@ -142,7 +139,7 @@ export default function Configuracoes() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `simplificapdv_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `simplificaoficina_configuracao_fiscal_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -156,14 +153,26 @@ export default function Configuracoes() {
     setLocalStorageData(localStorageKeys.map(({ key, label }) => ({ key, label, size: "0 B", items: 0 })));
   };
 
+  const locateDatabase = async () => {
+    if (!dbPath) return;
+    setDbLocationError("");
+    try {
+      await revealItemInDir(dbPath);
+    } catch (error) {
+      console.error(error);
+      setDbLocationError("Não foi possível abrir a pasta do banco de dados.");
+    }
+  };
+
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1>Configurações</h1>
-        <p>Gerencie as configurações do sistema e informações sobre o app.</p>
+        <h1>{sectionHeader[0]}</h1>
+        <p>{sectionHeader[1]}</p>
       </div>
 
       {/* Store info card */}
+      {section === "loja" && (
       <div className="card-elevated p-6 space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-lg border border-brand-200/30">
@@ -319,8 +328,10 @@ export default function Configuracoes() {
           )}
         </div>
       </div>
+      )}
 
       {/* Payment Settings Card */}
+      {section === "pagamentos" && (
       <div className="card-elevated p-6 space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg border border-green-200/30">
@@ -429,8 +440,10 @@ export default function Configuracoes() {
           </div>
         </div>
       </div>
+      )}
 
       {/* About card */}
+      {section === "atualizacoes" && (
       <div className="card-elevated p-6">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white text-2xl shadow-brand">
@@ -457,8 +470,10 @@ export default function Configuracoes() {
           </p>
         </div>
       </div>
+      )}
 
       {/* Database card */}
+      {section === "dados" && <>
       <div className="card-elevated p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg border border-purple-200/30">
@@ -474,13 +489,30 @@ export default function Configuracoes() {
         <div className="bg-ink-50/60 rounded-xl p-4 border border-ink-200/30">
           <div className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-1">Localização do Arquivo</div>
           <div className="font-mono text-xs text-ink-700 bg-ink-100/60 rounded-lg px-3 py-2 break-all">
-            {dbPath}
+            {dbPath || "Localizando arquivo..."}
           </div>
+        </div>
+
+        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">✓</span>
+            <div>
+              <h3 className="text-sm font-bold text-emerald-900">Dados da oficina salvos neste arquivo DB</h3>
+              <p className="mt-1 text-xs leading-relaxed text-emerald-800">O arquivo <code className="rounded bg-emerald-100 px-1">simplificaoficina.db</code> concentra os principais dados cadastrados no sistema:</p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {["Clientes", "Veículos", "Serviços", "Ordens de serviço", "Agendamentos", "Peças e estoque", "Financeiro", "Dados da oficina"].map((item) => (
+              <div key={item} className="rounded-lg border border-emerald-200/60 bg-white/70 px-2.5 py-2 text-center text-[10px] font-semibold text-emerald-900">{item}</div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-emerald-800"><strong>Importante:</strong> para preservar todos esses cadastros em um backup, feche o sistema e copie o arquivo DB indicado acima.</p>
         </div>
 
         {/* localStorage data */}
         <div>
-          <div className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-2">Dados Locais (localStorage)</div>
+          <div className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-1">Configurações auxiliares deste computador</div>
+          <p className="mb-2 text-[10px] text-ink-500">Estas configurações ficam separadas do arquivo DB e não incluem clientes, veículos ou ordens de serviço.</p>
           <div className="space-y-1.5">
             {localStorageData.map((item) => (
               <div key={item.key} className="flex items-center justify-between p-2.5 bg-ink-50/60 rounded-xl border border-ink-200/30">
@@ -498,14 +530,23 @@ export default function Configuracoes() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => void locateDatabase()} disabled={!dbPath} className="btn-outline text-xs flex items-center gap-1.5">
+            📂 Localizar arquivo DB
+          </button>
           <button onClick={exportLocalStorage} className="btn-outline text-xs flex items-center gap-1.5">
-            📥 Exportar Backup (JSON)
+            📥 Exportar Configuração Fiscal (JSON)
           </button>
           <button onClick={() => setShowClearConfirm(true)} className="btn-outline text-xs text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300 flex items-center gap-1.5">
-            🗑️ Limpar Dados Locais
+            🗑️ Limpar Configuração Fiscal
           </button>
         </div>
+
+        {dbLocationError && (
+          <div className="p-3 bg-red-50 border border-red-200/60 rounded-xl text-sm text-red-700 font-medium animate-slide-up">
+            ✕ {dbLocationError}
+          </div>
+        )}
 
         {cleared && (
           <div className="p-3 bg-emerald-50 border border-emerald-200/60 rounded-xl flex items-center gap-2 animate-slide-up">
@@ -515,8 +556,13 @@ export default function Configuracoes() {
         )}
 
         <div className="bg-blue-50/60 border border-blue-200/50 rounded-xl p-4 text-xs text-blue-800 leading-relaxed">
-          <strong>💡 Dica:</strong> Para fazer backup completo, copie o arquivo <code className="bg-blue-100 px-1 rounded">simplificapdv.db</code> da pasta indicada acima.
-          O botão "Exportar Backup" salva apenas as configurações locais (plano de suporte, avaliações e fiscal).
+          <strong>💡 Dois tipos de cópia:</strong> o arquivo <code className="bg-blue-100 px-1 rounded">simplificaoficina.db</code> é o backup completo dos dados da oficina. O arquivo JSON exporta somente a configuração fiscal auxiliar deste computador.
+        </div>
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-xs leading-relaxed text-red-800" role="alert">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base" aria-hidden>⚠️</span>
+            <p><strong className="text-red-900">Atenção: a perda deste arquivo DB é irrecuperável se não houver uma cópia de segurança.</strong><br/>É de extrema importância manter o arquivo <code className="rounded bg-red-100 px-1">simplificaoficina.db</code> guardado em um local seguro, preferencialmente também em outro dispositivo ou serviço de nuvem.</p>
+          </div>
         </div>
       </div>
 
@@ -526,9 +572,9 @@ export default function Configuracoes() {
           <div className="card-elevated max-w-sm w-full p-6 space-y-4 animate-scale-in">
             <div className="text-center">
               <div className="text-4xl mb-3">⚠️</div>
-              <h3 className="font-bold text-ink-900 text-lg">Limpar Dados Locais?</h3>
+              <h3 className="font-bold text-ink-900 text-lg">Limpar Configuração Fiscal?</h3>
               <p className="text-sm text-ink-500 mt-2">
-                Isso irá apagar: plano de suporte, avaliações e configuração fiscal.
+                Isso irá apagar a configuração fiscal armazenada neste computador.
                 <br /><strong>NÃO</strong> afeta ordens, peças, veículos ou clientes (banco de dados SQLite).
               </p>
             </div>
@@ -559,8 +605,10 @@ export default function Configuracoes() {
           </div>
         </div>
       )}
+      </>}
 
       {/* Updates card */}
+      {section === "atualizacoes" && (
       <div className="card-elevated p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg border border-blue-200/30">
@@ -622,6 +670,7 @@ export default function Configuracoes() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

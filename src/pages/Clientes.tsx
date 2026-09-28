@@ -17,7 +17,13 @@ export default function Clientes() {
 
   const submit = async () => {
     if (!form.name.trim()) return;
-    await api.createCustomer(form);
+    await api.createCustomer({
+      ...form,
+      name: form.name.trim(),
+      phone: form.phone?.trim() || undefined,
+      document: form.document?.trim() || undefined,
+      notes: form.notes?.trim() || undefined,
+    });
     setForm(empty);
     load();
   };
@@ -109,13 +115,14 @@ export default function Clientes() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-1.5 block">CPF/CNPJ</label>
+            <label className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-1.5 block">CPF/CNPJ <span className="normal-case font-medium text-ink-300">(opcional)</span></label>
             <input
               className="input"
-              placeholder="000.000.000-00"
+              placeholder="Pode deixar em branco"
               value={form.document}
               onChange={(e) => setForm({ ...form, document: e.target.value })}
             />
+            <p className="text-[10px] text-ink-400 mt-1.5">Solicite somente quando for necessário para nota fiscal ou outro documento.</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-ink-400 uppercase tracking-wider mb-1.5 block">Observações</label>

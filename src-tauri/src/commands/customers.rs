@@ -48,18 +48,34 @@ pub fn list_customers(state: State<DbState>, search: String) -> Result<Vec<Custo
 #[tauri::command]
 pub fn create_customer(state: State<DbState>, customer: NewCustomer) -> Result<Customer, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let name = customer.name.trim().to_string();
+    if name.is_empty() {
+        return Err("Informe o nome do cliente.".into());
+    }
+    let phone = customer.phone.and_then(|value| {
+        let value = value.trim().to_string();
+        (!value.is_empty()).then_some(value)
+    });
+    let document = customer.document.and_then(|value| {
+        let value = value.trim().to_string();
+        (!value.is_empty()).then_some(value)
+    });
+    let notes = customer.notes.and_then(|value| {
+        let value = value.trim().to_string();
+        (!value.is_empty()).then_some(value)
+    });
     conn.execute(
         "INSERT INTO customers (name, phone, document, notes) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![customer.name, customer.phone, customer.document, customer.notes],
+        rusqlite::params![name, phone, document, notes],
     )
     .map_err(|e| e.to_string())?;
 
     let id = conn.last_insert_rowid();
     Ok(Customer {
         id,
-        name: customer.name,
-        phone: customer.phone,
-        document: customer.document,
-        notes: customer.notes,
+        name,
+        phone,
+        document,
+        notes,
     })
 }

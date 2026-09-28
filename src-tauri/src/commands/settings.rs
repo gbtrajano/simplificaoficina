@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::State;
 
+/// Retorna o caminho real do SQLite usado pela aplicação.
+#[tauri::command]
+pub fn get_database_path(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(crate::db::db_path(&app).to_string_lossy().into_owned())
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StoreSettings {
     pub name: String,
